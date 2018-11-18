@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from tqdm import tnrange, tqdm_notebook
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 class Runner():
@@ -27,10 +27,10 @@ class Runner():
         total_val = len(self.val_dataloader)
         total = total_train + total_val
         self.log_each = (total_train/total_val)
-        for num_epoch, _ in tqdm_notebook(enumerate(range(self.num_epochs), 1), total=self.num_epochs, desc='Epochs'):
+        for num_epoch, _ in enumerate(range(self.num_epochs), 1):
             self.current_epoch = num_epoch
             self.stats = {}
-            with tqdm_notebook(total=total) as pbar:
+            with tqdm(total=total) as pbar:
                 self.pbar = pbar
                 self.__train()
                 self.__evaluate()
@@ -113,7 +113,7 @@ class Runner():
         self.model.eval()
         total = len(self.test_dataloader)
         with torch.no_grad():
-            with tqdm_notebook(enumerate(self.test_dataloader, 1), total=total, desc='Predictions') as test_pbar:
+            with tqdm(enumerate(self.test_dataloader, 1), total=total, desc='Predictions') as test_pbar:
                 for iter_num, batch in test_pbar:
                     inputs, labels = batch
                     inputs, labels = inputs.to(self.__device), labels.to(self.__device)
