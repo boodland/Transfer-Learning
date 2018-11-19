@@ -172,15 +172,15 @@ class Runner():
     def save_result(self, filename):
         train_result = (self.train_loss, self.train_acc)
         val_result = (self.val_loss, self.val_acc)
-        results = (train_result, val_result, self.test_acc)
+        results = (train_result, val_result, self.test_acc, self.num_epochs)
         torch.save(results, filename)
         
     @staticmethod
     def display_results(traditional_filename, transfer_filename):
         traditional_data = torch.load(traditional_filename)
-        traditional_train, traditional_val, traditional_test = traditional_data
+        traditional_train, traditional_val, traditional_test, traditional_num_epochs = traditional_data
         transfer_data = torch.load(transfer_filename)
-        transfer_train, transfer_val, transfer_test = transfer_data
+        transfer_train, transfer_val, transfer_test, transfer_num_epochs = transfer_data
         
         fontsize = 17
         fig, axs = plt.subplots(1, 2, figsize=(18, 5))
@@ -211,7 +211,7 @@ class Runner():
         ax_right.legend()
         ax_right.set_ylim(top=104)
 
-        num_epochs = 10
+        num_epochs = np.max([traditional_num_epochs, transfer_num_epochs])
         xticks = np.arange(0, len(traditional_train[1])+1, len(traditional_train[1])/num_epochs)
         xlabels = range(num_epochs+1)
         ax_left.set_xticks(xticks)
