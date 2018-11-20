@@ -53,8 +53,9 @@ class LayerVisualizer():
         plt.axis('off')
         plt.show()
         
-    def display_layers_channels_output(self, num_layers=None):
-        num_layers = num_layers if num_layers else len(self.layers_interceptor)
+    def display_layers_intermediate_activations(self, num_layers=None):
+        total_num_layers = len(self.layers_interceptor)
+        num_layers = min(num_layers, total_num_layers) if num_layers else total_num_layers
         for layer_num in range(num_layers):
             # We multiply each channel in the feature map array
             # by "how important this channel is" with regard to the gradient
@@ -122,7 +123,7 @@ class LayerVisualizer():
             ax.axis('off')
         plt.show()
     
-    def display_layers_activation(self, img_filename):
+    def display_layers_label_activations(self, img_filename):
         img_path = os.path.dirname(img_filename)
         generated_image_filename = img_path+'/selected_layer_{}.jpg'
         heatmaps = self.__get_layers_heatmap()

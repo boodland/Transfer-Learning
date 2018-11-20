@@ -25,13 +25,11 @@ class LayerInspector():
     normalizer_t = Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     compose_t = Compose([resize_t, to_tensor_t, normalizer_t])
     
-    def __init__(self, model, layers, class_index):
+    def __init__(self, model, layers):
         self.model = model
         self.layers = layers
         self.interceptors = []
         self.__register_layers()
-        
-        self.__index2label = [class_index[str(k)][1] for k in range(len(class_index))]
         
     def __register_layers(self):
         for layer in self.layers:
@@ -44,7 +42,8 @@ class LayerInspector():
         batch = self.compose_t(img)[None, :, :, :]
         return batch
     
-    def predict(self, img_path):
+    def predict(self, img_path, class_index):
+        index2label = [class_index[str(k)][1] for k in range(len(class_index))]
         batch = self.__get_image_batch(img_path)
     
         self.model.eval()
@@ -54,7 +53,7 @@ class LayerInspector():
         sorted_preds = preds_values.argsort()[::-1]
 
         for index in sorted_preds[:5]:
-            print(index, self.__index2label[index], preds_values[index])
+            print(index, index2label[index], preds_values[index])
             
         predicted_class = preds[:, sorted_preds[0]]
         predicted_class.backward()
