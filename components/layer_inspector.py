@@ -41,9 +41,6 @@ class LayerInspector():
             
     def __get_image_batch(self, img_path):
         img = Image.open(img_path)
-        plt.imshow(self.resize_t(img))
-        plt.axis('off')
-        plt.show()
         batch = self.compose_t(img)[None, :, :, :]
         return batch
     
