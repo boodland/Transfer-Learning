@@ -15,7 +15,7 @@ class Runner():
         self.__device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.__device)
               
-    def run(self, num_epochs=10):
+    def run(self, num_epochs=10, points_per_epoch=10):
         self.num_epochs = num_epochs
         self.train_loss = []
         self.train_acc = []
@@ -23,19 +23,19 @@ class Runner():
         self.val_acc = []
         self.test_acc = []
         
-        total_train = len(self.train_dataloader)
-        total_val = len(self.val_dataloader)
-        total = total_train + total_val
-        self.log_each = (total_train/total_val)
+        self.total_train = len(self.train_dataloader)
+        self.report_every = int(self.total_train/points_per_epoch)
         for num_epoch, _ in enumerate(range(self.num_epochs), 1):
             self.current_epoch = num_epoch
             self.stats = {}
-            with tqdm(total=total) as pbar:
+            with tqdm(total=self.total_train) as pbar:
                 self.pbar = pbar
                 self.__train()
                 self.__evaluate()
                 self.pbar.set_description(f'Epoch {self.current_epoch}')
         self.__predict()
+        
+        torch.cuda.empty_cache()
 
     def __metric(self, outputs, labels):
         predicted = (outputs >= 0.5).float()
@@ -65,22 +65,21 @@ class Runner():
             epoch_loss.append(loss_value)
             epoch_acc.append(acc_value)
 
-            if int(iter_num % self.log_each) == 0:
+            if iter_num % self.report_every == 0 or iter_num == self.total_train:
                 loss_mean = np.mean(epoch_loss)
                 acc_mean = np.mean(epoch_acc)
-
-                self.train_loss.append(loss_mean)
-                self.train_acc.append(acc_mean)
                 self.stats['train loss'] = loss_mean
                 self.stats['train acc'] = acc_mean
                 self.pbar.set_postfix(self.stats)
+                
             self.pbar.update(1)
-                    
-        torch.cuda.empty_cache()
+            
+        self.train_loss.append(loss_mean)
+        self.train_acc.append(acc_mean)
         
     def __evaluate(self):
-        epoch_loss = []
-        epoch_acc = []
+        evaluate_loss = []
+        evaluate_acc = []
         self.model.eval()
         self.pbar.set_description('Validating')
         with torch.no_grad():
@@ -93,22 +92,20 @@ class Runner():
                 loss_value = loss.item()
                 acc_value = self.__metric(outputs, labels)
 
-                epoch_loss.append(loss_value)
-                epoch_acc.append(acc_value)
+                evaluate_loss.append(loss_value)
+                evaluate_acc.append(acc_value)
 
-                loss_mean = np.mean(epoch_loss)
-                acc_mean = np.mean(epoch_acc)
-
-                self.val_loss.append(loss_mean)
-                self.val_acc.append(acc_mean)
-
+                loss_mean = np.mean(evaluate_loss)
+                acc_mean = np.mean(evaluate_acc)
                 self.stats['val loss'] = loss_mean
                 self.stats['val acc'] = acc_mean
                 self.pbar.set_postfix(self.stats)
-                self.pbar.update(1)
-                    
+
+        self.val_loss.append(loss_mean)
+        self.val_acc.append(acc_mean)
+                        
         torch.cuda.empty_cache()
-                    
+                            
     def __predict(self):
         self.model.eval()
         total = len(self.test_dataloader)
@@ -126,21 +123,13 @@ class Runner():
                     test_pbar.set_postfix({'acc avg': acc_mean})
                     
         torch.cuda.empty_cache()
-        
-    @staticmethod
-    def __smooth_curve(points, factor=0.8):
-        smoothed_points = [points[1]]
-        for point in points[1:]:
-            previous = smoothed_points[-1]
-            smoothed_points.append(previous * factor + point * (1 - factor))
-        return smoothed_points
     
     def display_result(self):
         fontsize = 17
         fig, axs = plt.subplots(1, 2, figsize=(18, 5))
         ax_left, ax_right = axs
-        ax_left.plot(self.__smooth_curve(self.train_loss), label='Train')
-        ax_left.plot(self.__smooth_curve(self.val_loss), label='Val')
+        ax_left.plot(self.train_loss, label='Train')
+        ax_left.plot(self.val_loss, label='Val')
         ax_left.set_title('Training Loss Cost', fontsize=fontsize)
         ax_left.set_ylabel('Loss', fontsize=fontsize)
         ax_left.set_xlabel('Epochs', fontsize=fontsize)
@@ -149,8 +138,8 @@ class Runner():
         ax_left.legend()
         ax_left.set_ylim(bottom=0)
 
-        ax_right.plot(self.__smooth_curve(self.train_acc), label='Train')
-        ax_right.plot(self.__smooth_curve(self.val_acc), label='Val')
+        ax_right.plot(self.train_acc, label='Train')
+        ax_right.plot(self.val_acc, label='Val')
         ax_right.axhline(np.mean(self.test_acc), color='g', label='Test Avg')
         ax_right.set_title('Training Accuracy', fontsize=fontsize)
         ax_right.set_ylabel('Accuracy (%)', fontsize=fontsize)
@@ -160,8 +149,8 @@ class Runner():
         ax_right.legend()
         ax_right.set_ylim(top=105)
 
-        xticks = np.arange(0, len(self.train_acc)+1, len(self.train_acc)/self.num_epochs)
-        xlabels = range(self.num_epochs+1)
+        xticks = np.arange(0, self.num_epochs)
+        xlabels = range(1, self.num_epochs+1)
         ax_left.set_xticks(xticks)
         ax_left.set_xticklabels(xlabels)
         ax_right.set_xticks(xticks)
@@ -185,10 +174,10 @@ class Runner():
         fontsize = 17
         fig, axs = plt.subplots(1, 2, figsize=(18, 5))
         ax_left, ax_right = axs
-        ax_left.plot(Runner.__smooth_curve(traditional_train[0]), label='Train Traditional')
-        ax_left.plot(Runner.__smooth_curve(traditional_val[0]), label='Val Traditional')
-        ax_left.plot(Runner.__smooth_curve(transfer_train[0]), label='Train Transfer')
-        ax_left.plot(Runner.__smooth_curve(transfer_val[0]), label='Val Transfer')
+        ax_left.plot(traditional_train[0], label='Train Traditional')
+        ax_left.plot(traditional_val[0], label='Val Traditional')
+        ax_left.plot(transfer_train[0], label='Train Transfer')
+        ax_left.plot(transfer_val[0], label='Val Transfer')
         ax_left.set_title('Training Loss Cost', fontsize=fontsize)
         ax_left.set_ylabel('Loss', fontsize=fontsize)
         ax_left.set_xlabel('Epochs', fontsize=fontsize)
@@ -197,11 +186,11 @@ class Runner():
         ax_left.legend()
         ax_left.set_ylim(bottom=0)
 
-        ax_right.plot(Runner.__smooth_curve(traditional_train[1]), label='Train Traditional')
-        ax_right.plot(Runner.__smooth_curve(traditional_val[1]), label='Val Traditional')
+        ax_right.plot(traditional_train[1], label='Train Traditional')
+        ax_right.plot(traditional_val[1], label='Val Traditional')
         ax_right.axhline(np.mean(traditional_test), color='m', label='Test Avg Traditional')
-        ax_right.plot(Runner.__smooth_curve(transfer_train[1]), label='Train Transfer')
-        ax_right.plot(Runner.__smooth_curve(transfer_val[1]), label='Val Transfer')
+        ax_right.plot(transfer_train[1], label='Train Transfer')
+        ax_right.plot(transfer_val[1], label='Val Transfer')
         ax_right.axhline(np.mean(transfer_test), color='c', label='Test Avg Transfer')
         ax_right.set_title('Training Accuracy', fontsize=fontsize)
         ax_right.set_ylabel('Accuracy (%)', fontsize=fontsize)
@@ -212,8 +201,8 @@ class Runner():
         ax_right.set_ylim(top=104)
 
         num_epochs = np.max([traditional_num_epochs, transfer_num_epochs])
-        xticks = np.arange(0, len(traditional_train[1])+1, len(traditional_train[1])/num_epochs)
-        xlabels = range(num_epochs+1)
+        xticks = np.arange(0, num_epochs)
+        xlabels = range(1, num_epochs+1)
         ax_left.set_xticks(xticks)
         ax_left.set_xticklabels(xlabels)
         ax_right.set_xticks(xticks)
